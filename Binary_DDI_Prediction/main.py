@@ -181,7 +181,7 @@ def update_D_a2t(net_E,edge_list,feat_mat,batch_edges,D_a2t,loss,trainer_D_a2t,d
 
 
 model = Model(num_nodes,n_topo_feats,n_hid,n_out_feat,feat_mat.shape[1])
-# list(model.named_parameters())
+
 D_t2a = Discriminator(feat_mat.shape[1],1)
 D_a2t = Discriminator(n_topo_feats,1)
 model.to(device)
@@ -192,7 +192,7 @@ criterion = nn.BCELoss().to(device)
 trainer_E = torch.optim.RMSprop(model.parameters(),lr=1e-3)
 trainer_D_t2a = torch.optim.RMSprop(D_t2a.parameters(),lr=1e-3)
 trainer_D_a2t = torch.optim.RMSprop(D_a2t.parameters(),lr=1e-3)
-# step_lr_scheduler = lr_scheduler.StepLR(optimizer,step_size=2,gamma=0.5)
+
 
 n_iterations = len(train_loader)
 num_epochs = n_epochs
@@ -208,7 +208,7 @@ for epoch in range(num_epochs):
     running_correct = 0.0
     total_samples = 0
     for i,(edges,labels) in enumerate(train_loader):
-#         print(train_edges_true.shape)
+
         edges,labels = edges.to(device),labels.to(device)
         y_pred,loss = update_E(model,train_edges_true,train_feat_mat,edges,labels,D_t2a,D_a2t,criterion,trainer_E,device)
         update_D_t2a(model,train_edges_true,train_feat_mat,edges,D_t2a,loss,trainer_D_t2a,device)
@@ -230,7 +230,7 @@ for epoch in range(num_epochs):
     pred_labels = reduce(merge,pred_labels)
     true_labels = np.array(true_labels)
     pred_labels = np.array(pred_labels)
-    # print(true_labels.shape)
+
     lr_precision, lr_recall, _ = precision_recall_curve(true_labels, pred_labels)
     aupr = auc(lr_recall, lr_precision)
     auroc = roc_auc_score(true_labels,pred_labels)
@@ -259,7 +259,7 @@ with torch.no_grad():
 
         n_test_samples += edges.shape[0]
         n_correct += (y_pred == labels).sum()
-#         print((y_pred == labels).sum())
+
     acc = 100.0 * n_correct/n_test_samples
     total_pred = torch.cat(total_pred)
     total_labels = torch.cat(total_labels)
