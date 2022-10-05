@@ -2,15 +2,14 @@ from __future__ import print_function
 
 import scipy.sparse as sp
 import numpy as np
-from scipy.sparse.linalg.eigen.arpack import eigsh, ArpackNoConvergence
+
 import glob
 import networkx as nx
 import os
 import pandas as pd
 from sklearn.decomposition import PCA
 
-
-
+'''Some utility functions'''
 
 
 def normalize_adj(adj, symmetric=True):
@@ -75,6 +74,7 @@ def load_feat(similarity_profile_file):
  
 def get_train_test_set(edges_all,num_nodes,ratio=0.2):
     
+    # Split dataset to training and test sets
     
     np.random.shuffle(edges_all)
     test_size=int(edges_all.shape[0]*ratio)
@@ -98,9 +98,7 @@ def get_train_test_set(edges_all,num_nodes,ratio=0.2):
     return adj_train, train_edges_true, train_edges_false, test_edges_true, test_edges_false
 
 
-def get_full_dataset():
-    
-    
+def get_full_dataset():   
     
     edge_df = pd.read_csv('KnownDDI.csv')
     G = nx.from_pandas_edgelist(edge_df,source='Drug1',target='Drug2')

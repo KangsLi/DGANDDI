@@ -19,13 +19,16 @@ import numpy as np
 from torch_geometric.nn import GCNConv,GATConv
 from utils import get_adj_mat
 
+'''Model definition'''
 
 
+# Graph Attention network
 class GAT(torch.nn.Module):
     def __init__(self,num_nodes,num_outputs,num_hidden,init_feat=64):
         super(GAT,self).__init__()
-        self.X = nn.Parameter(torch.randn((num_nodes,init_feat)),requires_grad=True)
-        nn.init.xavier_uniform_(self.X)
+        self.X = nn.Parameter(torch.randn((num_nodes,init_feat)),requires_grad=True) 
+        nn.init.xavier_uniform_(self.X) # Initialize node feature matrix with xavier initialization
+        #Define two conv layers
         self.conv1 = GATConv(init_feat,num_hidden,dropout=0.5,heads=2,concat=False)
         self.conv2 = GATConv(num_hidden,num_outputs,dropout=0.5,heads=2,concat=False)
         
@@ -36,6 +39,7 @@ class GAT(torch.nn.Module):
        
         return x
 
+#Generator definition with WGAN style
 class Generator(nn.Module):
     def __init__(self,num_inputs,num_outputs):
         super(Generator,self).__init__()
@@ -51,7 +55,23 @@ class Generator(nn.Module):
       
         return x
 
-#WGAN Style
+
+class MLP(nn.Module):
+    def __init__(self,num_inputs,num_outputs):
+        super(Generator,self).__init__()
+        self.l1 = nn.Linear(num_inputs,100)
+        self.l2 = nn.Linear(100,num_outputs)
+        self.relu = F.relu
+        self.dropout = nn.Dropout()
+        
+    def forward(self,x):
+        x = self.l1(x)
+        
+        x = self.l2(x)
+      
+        return x
+
+#WGAN Style discriminator
 class Discriminator(nn.Module):
     def __init__(self,num_inputs,num_outputs):
         super(Discriminator,self).__init__()
@@ -63,7 +83,7 @@ class Discriminator(nn.Module):
         x = self.l1(x)
         x = self.relu(x)
         x = self.l2(x)
-        # y = torch.sigmoid(x)
+        
         y = x.mean(0)
         return y
 
@@ -88,9 +108,9 @@ class Model(nn.Module):
         super(Model,self).__init__()
         # self.GCN = GCN(num_nodes,gcn_outputs,gcn_hidden)
         self.encoder = GAT(num_nodes,gcn_outputs,gcn_hidden)        
-        self.g_t = Generator(gcn_outputs,num_outputs)
+        self.g_t = MLP(gcn_outputs,num_outputs)
         self.g_t2a = Generator(num_outputs,attr_dim)
-        self.g_a = Generator(attr_dim,num_outputs)
+        self.g_a = MLP(attr_dim,num_outputs)
         self.g_a2t = Generator(num_outputs,gcn_outputs)
         self.classifier = DNN(num_outputs*4,1)
         
@@ -128,4 +148,3 @@ def get_edge_index(edge_list):
     edge_index = torch.tensor(edge_index,dtype=torch.long)
 
     return edge_index.t().contiguous()
-    
