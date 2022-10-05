@@ -19,24 +19,22 @@ import numpy as np
 from torch_geometric.nn import GCNConv,GATConv
 from utils import get_adj_mat
 
-'''Model definition'''
 
+'''Model definition'''
 
 # Graph Attention network
 class GAT(torch.nn.Module):
     def __init__(self,num_nodes,num_outputs,num_hidden,init_feat=64):
         super(GAT,self).__init__()
-        self.X = nn.Parameter(torch.randn((num_nodes,init_feat)),requires_grad=True) 
-        nn.init.xavier_uniform_(self.X) # Initialize node feature matrix with xavier initialization
+        self.X = nn.Parameter(torch.randn((num_nodes,init_feat)),requires_grad=True)
+        nn.init.xavier_uniform_(self.X)  # Initialize node feature matrix with xavier initialization
         #Define two conv layers
         self.conv1 = GATConv(init_feat,num_hidden,dropout=0.5,heads=2,concat=False)
         self.conv2 = GATConv(num_hidden,num_outputs,dropout=0.5,heads=2,concat=False)
-        
+
     def forward(self,edge_index):
         x = self.conv1(self.X,edge_index)
-        
         x = self.conv2(x,edge_index)
-       
         return x
 
 #Generator definition with WGAN style
@@ -46,15 +44,13 @@ class Generator(nn.Module):
         self.l1 = nn.Linear(num_inputs,100)
         self.l2 = nn.Linear(100,num_outputs)
         self.relu = F.relu
-        self.dropout = nn.Dropout()
         
     def forward(self,x):
         x = self.l1(x)
-        
+       
         x = self.l2(x)
-      
+        
         return x
-
 
 class MLP(nn.Module):
     def __init__(self,num_inputs,num_outputs):
@@ -62,13 +58,12 @@ class MLP(nn.Module):
         self.l1 = nn.Linear(num_inputs,100)
         self.l2 = nn.Linear(100,num_outputs)
         self.relu = F.relu
-        self.dropout = nn.Dropout()
         
     def forward(self,x):
         x = self.l1(x)
         
         x = self.l2(x)
-      
+        
         return x
 
 #WGAN Style discriminator
@@ -89,7 +84,6 @@ class Discriminator(nn.Module):
 
 
 
-
 class DNN(nn.Module):
     def __init__(self,num_inputs,num_outputs):
         super(DNN,self).__init__()
@@ -99,12 +93,15 @@ class DNN(nn.Module):
                       nn.Linear(256,num_outputs)
                       )
     def forward(self,x):
-        output = torch.sigmoid(self.layers(x))
+        output = self.layers(x)
         return output
 
 
+
+
+
 class Model(nn.Module):
-    def __init__(self,num_nodes,gcn_outputs,gcn_hidden,num_outputs,attr_dim):
+    def __init__(self,num_nodes,gcn_outputs,gcn_hidden,num_outputs,attr_dim,n_rels):
         super(Model,self).__init__()
         # self.GCN = GCN(num_nodes,gcn_outputs,gcn_hidden)
         self.encoder = GAT(num_nodes,gcn_outputs,gcn_hidden)        
@@ -112,33 +109,38 @@ class Model(nn.Module):
         self.g_t2a = Generator(num_outputs,attr_dim)
         self.g_a = MLP(attr_dim,num_outputs)
         self.g_a2t = Generator(num_outputs,gcn_outputs)
-        self.classifier = DNN(num_outputs*4,1)
         
-    def forward(self,edge_index,attr_mtx,x,*args):
-        
+        self.predictor = DNN(num_outputs*4,n_rels)
+     
+    def forward(self,edge_index,attr_mtx,triples,*args):
+       
         gcn_out = self.encoder(edge_index)
         topo_emd = self.g_t(gcn_out)
         t2a_mtx = self.g_t2a(topo_emd)
         attr_emd = self.g_a(attr_mtx)
         a2t_mtx = self.g_a2t(attr_emd)
-     
         
-        #Concatnation
+        
+        #Concatnate structural embedding and attribute embedding
         embedding = torch.hstack([topo_emd,attr_emd])
-        self.h_t = topo_emd
-        self.h_a = attr_emd
+
         self.topo_emb = gcn_out
         self.attr_emb = attr_mtx
         self.false_topo = a2t_mtx
         self.false_attr = t2a_mtx
-        
-        x = x.long()
+    
+        triples = triples.long()
+        heads = triples[:,0]
+        tails = triples[:,1]
        
+        
+        
 
-        X = torch.hstack([embedding[x[:,0]],embedding[x[:,1]]])
-        output = self.classifier(X)
+       
+        X = torch.hstack([embedding[heads],embedding[tails]])
+        output = self.predictor(X)
         return output,gcn_out,t2a_mtx,a2t_mtx
-
+ 
 
 
 def get_edge_index(edge_list):
@@ -148,3 +150,4 @@ def get_edge_index(edge_list):
     edge_index = torch.tensor(edge_index,dtype=torch.long)
 
     return edge_index.t().contiguous()
+    
