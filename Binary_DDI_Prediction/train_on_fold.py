@@ -25,13 +25,13 @@ import pandas as pd
 import argparse
 from sklearn.model_selection import StratifiedKFold
 
+
+'''Code for 5 fold cross-validation'''
 parser = argparse.ArgumentParser()
 parser.add_argument('--n_topo_feats', type=int, default=80, help='dim of topology features')
-parser.add_argument('--n_hid', type=int, default=256, help='num of hidden features')
+parser.add_argument('--n_hid', type=int, default=256, help='dim of hidden features in ')
 parser.add_argument('--n_out_feat', type=int, default=128, help='num of output features')
-# parser.add_argument('--lr', type=float, default=1e-2, help='learning rate')
 parser.add_argument('--n_epochs', type=int, default=100, help='num of epochs')
-# parser.add_argument('--kge_dim', type=int, default=64, help='dimension of interaction matrix')
 parser.add_argument('--batch_size', type=int, default=1000, help='batch size')
 parser.add_argument('--gpu_id', type=str,default='0', help='if -1, use cpu')
 args = parser.parse_args()
@@ -59,31 +59,22 @@ def sparse_mx_to_torch_sparse_tensor(sparse_mx):
     
 
 true_edges,num_nodes = get_adj_mat()
-all_edges,all_labels = get_full_dataset()
 
-# adj_mat, train_edges_true, train_edges_false, test_edges_true, test_edges_false=get_train_test_set(edges_all[:],num_nodes,0.2)
-# train_true_labels = np.ones(train_edges_true.shape[0],dtype=np.float32)
-# train_false_labels = np.zeros(train_edges_false.shape[0],dtype=np.float32)
-# test_true_labels = np.ones(test_edges_true.shape[0],dtype=np.float32)
-# test_false_labels = np.zeros(test_edges_false.shape[0],dtype=np.float32)
-# adj_mat = preprocess_adj(adj_mat)
 
-# adj_mat = sparse_mx_to_torch_sparse_tensor(adj_mat)
-feat_mat = load_feat('./drug_sim.csv')
+all_edges,all_labels = get_full_dataset() #Get all DDIs in dataset
+
+
+feat_mat = load_feat('./drug_sim.csv') #Load drug attribute file
 
 print('shape of initial feature matrix',feat_mat.shape)
 
 
 train_feat_mat = feat_mat
-train_feat_mat = torch.FloatTensor(train_feat_mat)
+train_feat_mat = torch.FloatTensor(train_feat_mat) 
 train_feat_mat = train_feat_mat.to(device)
-# train_edges = np.vstack([train_edges_true,train_edges_false])
-# y_train = np.concatenate([train_true_labels,train_false_labels])
-# test_edges = np.vstack([test_edges_true,test_edges_false])
-# y_test = np.concatenate([test_true_labels,test_false_labels])
-# print('number of training samples:',y_train.shape)
-# print('number of test samples:',y_test.shape)
+
 class DDIDataset(Dataset):
+    '''Customized dataset processing class'''
     def __init__(self,x,y):
         self.x = torch.from_numpy(x)
         self.y = torch.from_numpy(y)
@@ -94,64 +85,52 @@ class DDIDataset(Dataset):
     
     def __len__(self):
         return self.n_samples
-# train_dataset = DDIDataset(train_edges,y_train)
-# test_dataset = DDIDataset(test_edges,y_test)
-# train_loader = DataLoader(dataset=train_dataset,shuffle=True,batch_size=batch_size)
-# test_loader = DataLoader(dataset=test_dataset,batch_size=batch_size)
+
 
 def update_E(net_E,edge_list,feat_mat,batch_edges,labels,D_t2a,D_a2t,loss,trainer_E,device):
+
+    '''This function mainly used to optimize parameters of encoder'''
     edge_index = get_edge_index(edge_list).to(device)
 
     y_pred,gcn_out,t2a_mtx,a2t_mtx = net_E(edge_index,feat_mat,batch_edges,False)
-    # y_pred = y_pred.reshape(-1)
    
     trainer_E.zero_grad()
-
-    # ones = torch.ones(gcn_out.shape[0]).to(device)
-
-    # zeros = torch.zeros(a2t_mtx.shape[0]).to(device)    
-    one = torch.FloatTensor([1]).to(device)
-    # one = torch.FloatTensor([1])
+   
+    one = torch.FloatTensor([1]).to(device)  
     mone = (one * -1).to(device)
     D_a2t.eval()
     D_t2a.eval()
     fake_y_a2t = D_a2t(a2t_mtx)
     fake_y_a2t.backward(one)
-    # trainer_E.step()
+    
 
-    # trainer_E.zero_grad()
+   
     fake_y_t2a = D_t2a(t2a_mtx)
     fake_y_t2a.backward(one)
     trainer_E.step()
     trainer_E.zero_grad()
-    # trainer_E.step()
-    # model_loss = loss(y_pred,labels)+loss(fake_y_a2t,ones.reshape(fake_y_a2t.shape))+\
-    #              loss(fake_y_t2a,ones.reshape(fake_y_t2a.shape))
+  
     y_pred,gcn_out,t2a_mtx,a2t_mtx = net_E(edge_index,feat_mat,batch_edges,False)
     y_pred = y_pred.reshape(-1)
     model_loss = loss(y_pred,labels)
     model_loss.backward()
 
-
-    # topo_consistency = (torch.abs((gcn_out-a2t_mtx)).sum(axis=1).sum())/gcn_out.shape[0]
-    # attr_consistency = (torch.abs((feat_mat-t2a_mtx)).sum(axis=1).sum())/feat_mat.shape[0]
-    # consistency_loss = topo_consistency+attr_consistency
-    # consistency_loss.backward()
-    # trainer_E.step()
     trainer_E.step()
     return y_pred,model_loss
 
 def update_D_t2a(net_E,edge_list,feat_mat,batch_edges,D_t2a,loss,trainer_D_t2a,device):
+
+
+    '''This function mainly used to optimize parameters of discriminator for topology-to-attribute'''
     edge_index = get_edge_index(edge_list).to(device)
 
-    # _,_,t2a_mtx,_ = net_E(edge_index,feat_mat,batch_edges,False)
+   
     clamp_lower = -0.01
     clamp_upper = 0.01
     for p in D_t2a.parameters():
         p.data.clamp_(clamp_lower, clamp_upper)
     trainer_D_t2a.zero_grad()
-    # ones = torch.ones(feat_mat.shape[0]).to(device)
-    # zeros = torch.zeros(t2a_mtx.shape[0]).to(device)
+    
     one = torch.FloatTensor([1]).to(device)
     mone = (one * -1).to(device)
     net_E.eval()
@@ -161,61 +140,54 @@ def update_D_t2a(net_E,edge_list,feat_mat,batch_edges,D_t2a,loss,trainer_D_t2a,d
 
     real_y = D_t2a(feat_mat)
     real_y.backward(one)
-    # loss_D = (nn.BCELoss()(real_y, ones) +
-    #           nn.BCELoss()(fake_y, zeros)) / 2
 
-    # loss_D.backward()
     trainer_D_t2a.step()
     return 
 
 def update_D_a2t(net_E,edge_list,feat_mat,batch_edges,D_a2t,loss,trainer_D_a2t,device):
+
+    '''This function mainly used to optimize parameters of discriminator for attribute-to-topology'''
     edge_index = get_edge_index(edge_list).to(device)
-    # _,gcn_out,_,a2t_mtx = net_E(edge_index,feat_mat,batch_edges,False)
+   
     clamp_lower = -0.01
     clamp_upper = 0.01
     for p in D_a2t.parameters():
         p.data.clamp_(clamp_lower, clamp_upper)
 
     trainer_D_a2t.zero_grad()
-    # ones = torch.ones(a2t_mtx.shape[0]).to(device)
-    # zeros = torch.zeros(feat_mat.shape[0]).to(device)
+
     one = torch.FloatTensor([1]).to(device)
     mone = (one * -1).to(device)
     net_E.eval()
     _,gcn_out,_,a2t_mtx = net_E(edge_index,feat_mat,batch_edges,False)
     fake_y = D_a2t(a2t_mtx)
-    # fake_y = fake_y.view(-1)
+   
     fake_y.backward(mone)
 
     real_y = D_a2t(gcn_out)
-    # real_y = real_y.view(-1)
+  
     real_y.backward(one)
-    # loss_D = (nn.BCELoss()(real_y, ones) +
-            #   nn.BCELoss()(fake_y, zeros)) / 2
-
-    # loss_D.backward()
+   
     trainer_D_a2t.step()
     return 
 
-results = []
-# model = DDIGCN(feat_mat.shape[1],[100,feat_mat.shape[1]],0.5)
-# discriminator = Discriminator(feat_mat.shape[1])
-skf = StratifiedKFold(n_splits=5)
+results = []  #Record the prediction results for each fold
 
+
+skf = StratifiedKFold(n_splits=5) #Stratified split policy is adopted
+
+'''Perform 5 fold cross-validation'''
 for k,(train_index,test_index) in enumerate(skf.split(all_edges,all_labels)):
     edges_train,edges_test = all_edges[train_index],all_edges[test_index]
     y_train,y_test = all_labels[train_index],all_labels[test_index]
     train_edges_true = edges_train[y_train==1]
-    # print('edge list',train_edges_true.shape)
-    # print('training set',edges_train.shape)
-    # print('testing set',edges_test.shape)
-    # print('testing set true',edges_test[test_index==1])
+   
     train_dataset = DDIDataset(edges_train,y_train.astype(np.float32))
     test_dataset = DDIDataset(edges_test,y_test)
     train_loader = DataLoader(dataset=train_dataset,shuffle=True,batch_size=batch_size)
     test_loader = DataLoader(dataset=test_dataset,batch_size=batch_size)
     model = Model(num_nodes,n_topo_feats,n_hid,n_out_feat,feat_mat.shape[1],alpha=0.6)
-    # list(model.named_parameters())
+    
     D_t2a = Discriminator(feat_mat.shape[1],1)
     D_a2t = Discriminator(n_topo_feats,1)
     model.to(device)
@@ -226,14 +198,15 @@ for k,(train_index,test_index) in enumerate(skf.split(all_edges,all_labels)):
     trainer_E = torch.optim.RMSprop(model.parameters(),lr=1e-3)
     trainer_D_t2a = torch.optim.RMSprop(D_t2a.parameters(),lr=1e-3)
     trainer_D_a2t = torch.optim.RMSprop(D_a2t.parameters(),lr=1e-3)
-    # step_lr_scheduler = lr_scheduler.StepLR(optimizer,step_size=2,gamma=0.5)
+    
 
     n_iterations = len(train_loader)
     num_epochs = 30
     start = time.time()
-    # writer = SummaryWriter("runs/drugbank")
+
     running_loss = 0.0
     running_correct = 0.0
+    # Training phase
     for epoch in range(num_epochs):
         model.train()
         true_labels,pred_labels = [],[]
@@ -241,7 +214,7 @@ for k,(train_index,test_index) in enumerate(skf.split(all_edges,all_labels)):
         running_correct = 0.0
         total_samples = 0
         for i,(edges,labels) in enumerate(train_loader):
-    #         print(train_edges_true.shape)
+ 
             edges,labels = edges.to(device),labels.to(device)
             y_pred,loss = update_E(model,train_edges_true,train_feat_mat,edges,labels,D_t2a,D_a2t,criterion,trainer_E,device)
             update_D_t2a(model,train_edges_true,train_feat_mat,edges,D_t2a,loss,trainer_D_t2a,device)
@@ -256,8 +229,7 @@ for k,(train_index,test_index) in enumerate(skf.split(all_edges,all_labels)):
 
         print(f"epoch {epoch+1}/{num_epochs};trainging loss: {running_loss/n_iterations:.4f}")
         print(f"epoch {epoch+1}/{num_epochs};training set acc: {running_correct/total_samples:.4f}")
-        # writer.add_scalar('training loss',running_loss/n_iterations,epoch)
-        # writer.add_scalar('training accuracy',running_correct/total_samples,epoch)
+    
         def merge(x,y):
             return x + y
         
@@ -265,12 +237,10 @@ for k,(train_index,test_index) in enumerate(skf.split(all_edges,all_labels)):
         pred_labels = reduce(merge,pred_labels)
         true_labels = np.array(true_labels)
         pred_labels = np.array(pred_labels)
-        # print(true_labels.shape)
         lr_precision, lr_recall, _ = precision_recall_curve(true_labels, pred_labels)
         aupr = auc(lr_recall, lr_precision)
         auroc = roc_auc_score(true_labels,pred_labels)
-        # writer.add_scalar("AUPR",aupr,epoch)
-        # writer.add_scalar("AUROC",auroc,epoch)
+      
 
     end = time.time()
     elapsed = end-start
@@ -281,6 +251,7 @@ for k,(train_index,test_index) in enumerate(skf.split(all_edges,all_labels)):
     total_labels = []
     total_pred = []
     fold_results = []
+    # Testing phase
     with torch.no_grad():
         model.eval()
         for edges,labels in test_loader:
@@ -295,12 +266,11 @@ for k,(train_index,test_index) in enumerate(skf.split(all_edges,all_labels)):
 
             n_test_samples += edges.shape[0]
             n_correct += (y_pred == labels).sum()
-    #         print((y_pred == labels).sum())
+
+        # Calculate evaluation indexes
         acc = 100.0 * n_correct/n_test_samples
         total_pred = torch.cat(total_pred)
-        total_labels = torch.cat(total_labels)
-        # writer.add_pr_curve('PR-Curve',total_labels,total_pred,global_step=0)
-        # writer.close()
+        total_labels = torch.cat(total_labels)       
         lr_precision, lr_recall, _ = precision_recall_curve(total_labels,total_pred)
         aupr = auc(lr_recall, lr_precision)
         auroc = roc_auc_score(total_labels,total_pred )
@@ -312,6 +282,7 @@ for k,(train_index,test_index) in enumerate(skf.split(all_edges,all_labels)):
         print(f"AUPR: {aupr}")
         print(f"AUROC: {auroc}")
     results.append(fold_results)
-    # model.vis_emb()
+  
 
+#Write cross-validation results to file
 pd.DataFrame(results,columns=['fold','acc','aupr','auroc']).to_csv('cross_validation.csv')
