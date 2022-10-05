@@ -12,9 +12,9 @@ from utils import get_adj_mat,load_feat,normalize_adj,preprocess_adj,get_train_t
 import sys
 import time
 import os
-# from model import DDIGCN,Discriminator,Model,Generator,get_edge_index,GCN
-from model_concat import Discriminator,Model,Generator,get_edge_index,GCN
-# from model_gcn import Discriminator,Model,Generator,get_edge_index,GCN
+
+from model import Discriminator,Model,Generator,get_edge_index,GCN
+
 from sklearn.neighbors import KernelDensity
 import random
 from sklearn.manifold import TSNE
