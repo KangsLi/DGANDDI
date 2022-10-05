@@ -107,11 +107,11 @@ class Model(nn.Module):
     def __init__(self,num_nodes,gcn_outputs,gcn_hidden,num_outputs,attr_dim):
         super(Model,self).__init__()
         # self.GCN = GCN(num_nodes,gcn_outputs,gcn_hidden)
-        self.encoder = GAT(num_nodes,gcn_outputs,gcn_hidden)        
-        self.g_t = MLP(gcn_outputs,num_outputs)
-        self.g_t2a = Generator(num_outputs,attr_dim)
-        self.g_a = MLP(attr_dim,num_outputs)
-        self.g_a2t = Generator(num_outputs,gcn_outputs)
+        self.encoder = GAT(num_nodes,gcn_outputs,gcn_hidden) #Topology structure encoder with GAT       
+        self.g_t = MLP(gcn_outputs,num_outputs) #Projecting structural embedding to the common space
+        self.g_t2a = Generator(num_outputs,attr_dim) #Generator for structure to attribute
+        self.g_a = MLP(attr_dim,num_outputs) #MLP to encoding drug attribute
+        self.g_a2t = Generator(num_outputs,gcn_outputs) #Generator for attribute to structure
         self.classifier = DNN(num_outputs*4,1)
         
     def forward(self,edge_index,attr_mtx,x,*args):
