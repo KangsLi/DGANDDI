@@ -201,13 +201,12 @@ for k,(train_index,test_index) in enumerate(skf.split(all_edges,all_labels)):
     
 
     n_iterations = len(train_loader)
-    num_epochs = 30
     start = time.time()
 
     running_loss = 0.0
     running_correct = 0.0
     # Training phase
-    for epoch in range(num_epochs):
+    for epoch in range(n_epochs):
         model.train()
         true_labels,pred_labels = [],[]
         running_loss = 0.0
