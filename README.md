@@ -1,5 +1,5 @@
 # DGANDDI
-Source code for ["DGANDDI: Double Generative adversarial Networks for Drug-drug Interaction Prediction"] 
+Source code for ["DGANDDI: Double Generative adversarial Networks for Drug-drug Interaction Prediction"](https://ieeexplore.ieee.org/document/9963691)
    
 ![Overview DGANDDI framework](Framework.png)  
 
