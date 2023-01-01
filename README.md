@@ -24,7 +24,7 @@ This folder contains the source code files and dataset for binary DDI prediction
 -  train_on_fold.py —— contains codes for cross-validation.
 
 ### Multi-DDI-Prediction
-This folder contains the source code files and dataset for multi-class DDI prediction problem. The details of each file are similary to binary case.
+This folder contains the source code files and dataset for multi-class DDI prediction problem. The details of each file are similar to binary case.
 
 
 
